@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slowloris Attack Live Demo Dashboard</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.js"></script>
+    
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #34495e;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --danger-color: #e74c3c;
+            --info-color: #3498db;
+            --dark-bg: #1a1a1a;
+            --card-bg: #2d3436;
+        }
+
+        body {
+            background: linear-gradient(135deg, var(--dark-bg) 0%, var(--secondary-color) 100%);
+            color: #ecf0f1;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+
+        .dashboard-header {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 2px solid var(--accent-color);
+            padding: 1rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .status-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .status-active {
+            background: var(--danger-color);
+            color: white;
+            animation: pulse 2s infinite;
+        }
+
+        .status-monitoring {
+            background: var(--warning-color);
+            color: white;
+            animation: glow 3s infinite alternate;
+        }
+
+        .status-inactive {
+            background: var(--success-color);
+            color: white;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.5); }
+            100% { box-shadow: 0 0 0 8px rgba(243, 156, 18, 0); }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        .metric-card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            color: #bdc3c7;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .chart-container {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            height: 400px;
+        }
+
+        .control-panel {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .btn-attack {
+            background: linear-gradient(45deg, var(--danger-color), #c0392b);
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        .btn-attack:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(231, 76, 60, 0.6);
+        }
+
+        .btn-stop {
+            background: linear-gradient(45deg, var(--success-color), #229954);
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 25px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(39, 174, 96, 0.4);
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(39, 174, 96, 0.6);
+        }
+
+        .event-log {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 1.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .event-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .event-item:last-child {
+            border-bottom: none;
+        }
+
+        .event-timestamp {
+            color: #95a5a6;
+            font-size: 0.8rem;
+        }
+
+        .progress-container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-bar-custom {
+            height: 10px;
+            background: linear-gradient(90deg, var(--info-color), var(--accent-color));
+            transition: width 0.5s ease;
+        }
+
+        .warning-banner {
+            background: linear-gradient(45deg, var(--warning-color), #d68910);
+            color: white;
+            padding: 1rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+            font-weight: bold;
+            animation: glow 3s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { box-shadow: 0 0 20px rgba(243, 156, 18, 0.5); }
+            to { box-shadow: 0 0 30px rgba(243, 156, 18, 0.8); }
+        }
+
+        .real-time-indicator {
+            display: inline-flex;
+            align-items: center;
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--success-color);
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: pulse-dot 1s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Warning Banner -->
+    <div class="warning-banner">
+        <i class="fas fa-exclamation-triangle"></i>
+        <strong>EDUCATIONAL PURPOSE ONLY</strong> - This demonstration is for cybersecurity education and research
+        <i class="fas fa-exclamation-triangle"></i>
+    </div>
+
+    <!-- Dashboard Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1 class="mb-0">
+                        <i class="fas fa-shield-alt text-danger"></i>
+                        Slowloris Attack Demo Dashboard
+                    </h1>
+                    <p class="mb-0 text-muted">Real-time DoS Attack Monitoring & Analysis</p>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="status-indicator" id="attack-status">
+                        <i class="fas fa-circle me-2"></i>
+                        <span id="status-text">System Ready</span>
+                    </div>
+                    <div class="mt-2">
+                        <span class="real-time-indicator">
+                            <span class="pulse-dot"></span>
+                            Live Monitoring
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- Control Panel -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="control-panel">
+                    <h3 class="mb-3">Attack Control Center</h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <button class="btn btn-attack w-100" id="start-attack" onclick="startAttack()">
+                                <i class="fas fa-play me-2"></i>
+                                Launch Slowloris Attack
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-stop w-100" id="stop-attack" onclick="stopAttack()" disabled>
+                                <i class="fas fa-stop me-2"></i>
+                                Stop Attack
+                            </button>
+                        </div>
+                        <div class="col-md-4">
+                            <button class="btn btn-outline-secondary w-100" id="stop-monitoring" onclick="stopMonitoring()">
+                                <i class="fas fa-power-off me-2"></i>
+                                Stop All Monitoring
+                            </button>
+                        </div>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar-custom" id="attack-progress" style="width: 0%"></div>
+                    </div>
+                    <p class="mt-3 text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Monitor the real-time impact of the Slowloris attack on the target server
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Real-time Metrics -->
+        <div class="stats-grid">
+            <div class="metric-card text-center">
+                <div class="metric-value text-danger" id="connections-count">0</div>
+                <div class="metric-label">Active Connections</div>
+            </div>
+            <div class="metric-card text-center">
+                <div class="metric-value text-warning" id="response-time">0ms</div>
+                <div class="metric-label">Server Response Time</div>
+            </div>
+            <div class="metric-card text-center">
+                <div class="metric-value text-info" id="success-rate">100%</div>
+                <div class="metric-label">Success Rate</div>
+            </div>
+            <div class="metric-card text-center">
+                <div class="metric-value text-success" id="uptime">00:00:00</div>
+                <div class="metric-label">Attack Duration</div>
+            </div>
+        </div>
+
+        <!-- Charts Row 1 -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <h5 class="text-center mb-3">
+                        <i class="fas fa-network-wired text-danger"></i>
+                        Active Connections Over Time
+                    </h5>
+                    <canvas id="connectionsChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <h5 class="text-center mb-3">
+                        <i class="fas fa-clock text-warning"></i>
+                        Server Response Times
+                    </h5>
+                    <canvas id="responseChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row 2 -->
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <h5 class="text-center mb-3">
+                        <i class="fas fa-chart-line text-info"></i>
+                        Success Rate Trends
+                    </h5>
+                    <canvas id="successChart"></canvas>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="chart-container">
+                    <h5 class="text-center mb-3">
+                        <i class="fas fa-server text-success"></i>
+                        System Resource Usage
+                    </h5>
+                    <canvas id="resourceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Event Log -->
+        <div class="row">
+            <div class="col-12">
+                <div class="event-log">
+                    <h5 class="mb-3">
+                        <i class="fas fa-list-alt text-info"></i>
+                        Live Event Log
+                    </h5>
+                    <div id="event-log-container">
+                        <div class="event-item">
+                            <span>System initialized and ready for demonstration</span>
+                            <span class="event-timestamp" id="init-time"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io();
+
+        // Chart configurations
+        const chartConfig = {
+            type: 'line',
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#ecf0f1'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: '#ecf0f1' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    },
+                    y: {
+                        ticks: { color: '#ecf0f1' },
+                        grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                    }
+                },
+                animation: {
+                    duration: 500
+                }
+            }
+        };
+
+        // Initialize charts
+        const connectionsChart = new Chart(document.getElementById('connectionsChart'), {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Active Connections',
+                    data: [],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            }
+        });
+
+        const responseChart = new Chart(document.getElementById('responseChart'), {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Response Time (ms)',
+                    data: [],
+                    borderColor: '#f39c12',
+                    backgroundColor: 'rgba(243, 156, 18, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            }
+        });
+
+        const successChart = new Chart(document.getElementById('successChart'), {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Success Rate (%)',
+                    data: [],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                ...chartConfig.options,
+                scales: {
+                    ...chartConfig.options.scales,
+                    y: {
+                        ...chartConfig.options.scales.y,
+                        min: 0,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        const resourceChart = new Chart(document.getElementById('resourceChart'), {
+            ...chartConfig,
+            data: {
+                labels: [],
+                datasets: [
+                    {
+                        label: 'CPU Usage (%)',
+                        data: [],
+                        borderColor: '#27ae60',
+                        backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Memory Usage (%)',
+                        data: [],
+                        borderColor: '#9b59b6',
+                        backgroundColor: 'rgba(155, 89, 182, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                ...chartConfig.options,
+                scales: {
+                    ...chartConfig.options.scales,
+                    y: {
+                        ...chartConfig.options.scales.y,
+                        min: 0,
+                        max: 100
+                    }
+                }
+            }
+        });
+
+        // Global variables
+        let attackStartTime = null;
+        let uptimeInterval = null;
+
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            addLogEvent('Connected to monitoring dashboard', 'success');
+        });
+
+        socket.on('metrics_update', function(data) {
+            updateMetrics(data);
+            updateCharts(data);
+        });
+
+        // Update real-time metrics
+        function updateMetrics(data) {
+            document.getElementById('connections-count').textContent = data.connections || 0;
+            document.getElementById('response-time').textContent = (data.response_time || 0).toFixed(0) + 'ms';
+            document.getElementById('success-rate').textContent = (data.success_rate || 100).toFixed(1) + '%';
+            
+            // Update progress bar based on connections
+            const progress = Math.min((data.connections / 400) * 100, 100);
+            document.getElementById('attack-progress').style.width = progress + '%';
+        }
+
+        // Update charts with new data
+        function updateCharts(data) {
+            const timestamp = new Date(data.timestamp).toLocaleTimeString();
+            
+            // Update connections chart
+            updateChart(connectionsChart, timestamp, data.connections || 0);
+            
+            // Update response time chart
+            updateChart(responseChart, timestamp, data.response_time || 0);
+            
+            // Update success rate chart
+            updateChart(successChart, timestamp, data.success_rate || 100);
+            
+            // Update resource chart
+            updateMultiChart(resourceChart, timestamp, [data.cpu_usage || 0, data.memory_usage || 0]);
+        }
+
+        function updateChart(chart, label, value) {
+            chart.data.labels.push(label);
+            chart.data.datasets[0].data.push(value);
+            
+            // Keep only last 20 points
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+            }
+            
+            chart.update('none');
+        }
+
+        function updateMultiChart(chart, label, values) {
+            chart.data.labels.push(label);
+            values.forEach((value, index) => {
+                chart.data.datasets[index].data.push(value);
+            });
+            
+            // Keep only last 20 points
+            if (chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets.forEach(dataset => dataset.data.shift());
+            }
+            
+            chart.update('none');
+        }
+
+        // Attack control functions
+        async function startAttack() {
+            try {
+                const response = await fetch('/api/start_attack', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('attack-status').className = 'status-indicator status-active';
+                    document.getElementById('status-text').textContent = 'Attack Active';
+                    document.getElementById('start-attack').disabled = true;
+                    document.getElementById('stop-attack').disabled = false;
+                    
+                    attackStartTime = new Date();
+                    startUptimeCounter();
+                    
+                    addLogEvent('Slowloris attack initiated', 'danger');
+                    addLogEvent('Vulnerable server started on port 8080', 'warning');
+                } else {
+                    addLogEvent('Failed to start attack: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                addLogEvent('Error starting attack: ' + error.message, 'danger');
+            }
+        }
+
+        async function stopAttack() {
+            try {
+                const response = await fetch('/api/stop_attack', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('attack-status').className = 'status-indicator status-monitoring';
+                    document.getElementById('status-text').textContent = 'Monitoring Recovery';
+                    document.getElementById('start-attack').disabled = false;
+                    document.getElementById('stop-attack').disabled = true;
+                    
+                    // Keep uptime counter running to show total monitoring time
+                    // stopUptimeCounter(); - Don't stop, keep showing monitoring duration
+                    
+                    addLogEvent('Attack stopped - monitoring server recovery', 'success');
+                    addLogEvent('Server continues running on localhost:8080', 'info');
+                    addLogEvent('Watch metrics show recovery vs attack impact!', 'info');
+                } else {
+                    addLogEvent('Failed to stop attack: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                addLogEvent('Error stopping attack: ' + error.message, 'danger');
+            }
+        }
+
+        async function stopMonitoring() {
+            try {
+                const response = await fetch('/api/stop_monitoring', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    document.getElementById('attack-status').className = 'status-indicator status-inactive';
+                    document.getElementById('status-text').textContent = 'System Ready';
+                    document.getElementById('start-attack').disabled = false;
+                    document.getElementById('stop-attack').disabled = true;
+                    
+                    stopUptimeCounter();
+                    
+                    addLogEvent('All monitoring stopped', 'warning');
+                    addLogEvent('Server still running on localhost:8080', 'info');
+                } else {
+                    addLogEvent('Failed to stop monitoring: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                addLogEvent('Error stopping monitoring: ' + error.message, 'danger');
+            }
+        }
+
+
+
+        async function startServer() {
+            try {
+                const response = await fetch('/api/start_server', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLogEvent('Docker server started successfully', 'success');
+                    addLogEvent('Apache server running on localhost:8080', 'info');
+                } else {
+                    addLogEvent('Failed to start server: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                addLogEvent('Error starting server: ' + error.message, 'danger');
+            }
+        }
+
+
+
+        async function resetDashboard() {
+            try {
+                const response = await fetch('/api/reset_metrics', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Reset UI elements
+                    document.getElementById('connections-count').textContent = '0';
+                    document.getElementById('response-time').textContent = '0ms';
+                    document.getElementById('success-rate').textContent = '100%';
+                    document.getElementById('uptime').textContent = '00:00:00';
+                    
+                    // Reset status
+                    document.getElementById('attack-status').className = 'status-indicator status-inactive';
+                    document.getElementById('status-text').textContent = 'System Ready';
+                    
+                    // Reset buttons
+                    document.getElementById('start-attack').disabled = false;
+                    document.getElementById('stop-attack').disabled = true;
+                    document.getElementById('stop-monitoring').disabled = true;
+                    
+                    // Clear charts by reloading the page (easiest way to reset Chart.js)
+                    addLogEvent('Dashboard reset - showing fresh server stats', 'info');
+                    
+                    // Optionally reload page for complete reset
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    addLogEvent('Failed to reset dashboard: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                addLogEvent('Error resetting dashboard: ' + error.message, 'danger');
+            }
+        }
+
+        async function stopServer() {
+            try {
+                const response = await fetch('/api/stop_server', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    addLogEvent('Docker server stopped', 'warning');
+                    addLogEvent('localhost:8080 is no longer accessible', 'info');
+                } else {
+                    addLogEvent('Failed to stop server: ' + result.error, 'danger');
+                }
+            } catch (error) {
+                addLogEvent('Error stopping server: ' + error.message, 'danger');
+            }
+        }
+
+        // Uptime counter
+        function startUptimeCounter() {
+            uptimeInterval = setInterval(() => {
+                if (attackStartTime) {
+                    const now = new Date();
+                    const diff = now - attackStartTime;
+                    const hours = Math.floor(diff / 3600000);
+                    const minutes = Math.floor((diff % 3600000) / 60000);
+                    const seconds = Math.floor((diff % 60000) / 1000);
+                    
+                    document.getElementById('uptime').textContent = 
+                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }, 1000);
+        }
+
+        function stopUptimeCounter() {
+            if (uptimeInterval) {
+                clearInterval(uptimeInterval);
+                uptimeInterval = null;
+            }
+            document.getElementById('uptime').textContent = '00:00:00';
+        }
+
+        // Event logging
+        function addLogEvent(message, type = 'info') {
+            const container = document.getElementById('event-log-container');
+            const eventItem = document.createElement('div');
+            eventItem.className = 'event-item';
+            
+            const iconMap = {
+                'success': 'fas fa-check-circle text-success',
+                'danger': 'fas fa-exclamation-triangle text-danger',
+                'warning': 'fas fa-exclamation-circle text-warning',
+                'info': 'fas fa-info-circle text-info'
+            };
+            
+            eventItem.innerHTML = `
+                <span><i class="${iconMap[type] || iconMap.info}"></i> ${message}</span>
+                <span class="event-timestamp">${new Date().toLocaleTimeString()}</span>
+            `;
+            
+            container.insertBefore(eventItem, container.firstChild);
+            
+            // Keep only last 10 events
+            if (container.children.length > 10) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('init-time').textContent = new Date().toLocaleTimeString();
+            addLogEvent('Dashboard loaded and monitoring initialized', 'success');
+        });
+    </script>
+</body>
+</html> 
