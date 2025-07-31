@@ -18,7 +18,7 @@ A comprehensive educational platform demonstrating how Slowloris attacks work an
 
 This defense mechanism demo consists of **three main components** working together to demonstrate cybersecurity concepts:
 
-### **1. Target Server (localhost:3000)**
+### **1. Target Server (localhost:8080)**
 - A **vulnerable Flask web server** that simulates a real website
 - Can be **dynamically protected or unprotected** 
 - Tracks and reports its own performance metrics
@@ -57,7 +57,7 @@ This defense mechanism demo consists of **three main components** working togeth
 ```
 ┌─────────────────────┐    ┌─────────────────────┐    ┌─────────────────────┐
 │   Target Server     │    │  Attack Dashboard   │    │  Slowloris Attack   │
-│   (localhost:3000)  │◄───┤  (localhost:4000)   │────┤     Script          │
+│   (localhost:8080)  │◄───┤  (localhost:4000)   │────┤     Script          │
 │                     │    │                     │    │                     │
 │ • Flask Web Server  │    │ • Control Interface │    │ • 50 TCP Connections│
 │ • Dynamic Protection│    │ • Live Monitoring   │    │ • Slow HTTP Requests│
@@ -109,7 +109,7 @@ python attack_dashboard.py
 ```
 
 ### **Step 3: Verify Setup**
-- **Target Server**: Visit http://localhost:3000 (should show server status page)
+- **Target Server**: Visit http://localhost:8080 (should show server status page)
 - **Attack Dashboard**: Visit http://localhost:4000 (should show control interface)
 
 ## 📖 Step-by-Step Usage Guide
@@ -126,7 +126,7 @@ python attack_dashboard.py
    - **Protection Status**: Shows "🔓 VULNERABLE" (no defenses active)
 
 3. **Test the Target Server**
-   - Open http://localhost:3000 in another tab
+   - Open http://localhost:8080 in another tab
    - Page should load quickly (under 1 second)
    - This represents a normal, healthy web server
 
@@ -141,7 +141,7 @@ python attack_dashboard.py
    - **Response Time**: Spikes to 5000-10000ms (extremely slow)
    - **Success Rate**: Drops to 20-50% (many requests fail)
    - **Charts**: Show dramatic performance degradation
-   - **Target Server**: Try visiting http://localhost:3000 - it will be very slow or timeout
+   - **Target Server**: Try visiting http://localhost:8080 - it will be very slow or timeout
 
 3. **Understand What's Happening**
    - The attack script opened 50 slow connections to the server
@@ -159,7 +159,7 @@ python attack_dashboard.py
 2. **Observe the Defense in Action**
    - **Response Time**: Drops back to 100-300ms (nearly normal!)
    - **Success Rate**: Recovers to 90-100% (defenses working!)
-   - **Target Server**: http://localhost:3000 loads normally again
+   - **Target Server**: http://localhost:8080 loads normally again
    - **Charts**: Show dramatic recovery
 
 3. **Understand What Just Happened**
@@ -322,7 +322,7 @@ These same techniques protect real web servers:
 
 #### **"Connection Refused" Error**
 ```
-Problem: Can't connect to localhost:3000 or localhost:4000
+Problem: Can't connect to localhost:8080 or localhost:4000
 Solution: Make sure both servers are running
 Check: Look for "Starting Target Server" and "Starting Defense Demo Dashboard" messages
 ```
@@ -338,7 +338,7 @@ Check: Protection Status should show "🔓 VULNERABLE" before starting attack
 ```
 Problem: Clicking "Toggle Protection" has no effect
 Solution: Check that target server is running and responding
-Check: Visit http://localhost:3000 to verify server is accessible
+Check: Visit http://localhost:8080 to verify server is accessible
 ```
 
 #### **Charts Don't Update**
